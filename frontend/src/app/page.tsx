@@ -25,11 +25,11 @@ const SIGNAL_TEXT: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  let predictions, volatility, features, signals, forecastData;
+  let predictions, volatility, threshold, features, signals, forecastData;
   try {
     [
       { predictions },
-      { volatility, threshold },
+      { volatility, threshold: threshold },
       { feature_importance: features },
       signals,
       forecastData,
