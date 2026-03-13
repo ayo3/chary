@@ -6,9 +6,9 @@ import { DollarSign, TrendingUp, Activity, AlertTriangle, Zap, ChevronRight } fr
 import { Sector } from "@/lib/sectors";
 
 export default async function SectorPageContent({ sector }: { sector: Sector }) {
-  let predictions, volatility, signals;
+  let predictions, volatility, threshold, signals;
   try {
-    [{ predictions }, { volatility, threshold }, signals] = await Promise.all([
+    [{ predictions }, { volatility, threshold: threshold }, signals] = await Promise.all([
       api.predictions(), api.volatility(), api.signals(),
     ]);
   } catch (e: any) {
