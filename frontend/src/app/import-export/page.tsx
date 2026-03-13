@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import SectorPageContent from "@/components/SectorPageContent";
 import { SECTORS } from "@/lib/sectors";
 export const revalidate = 300;

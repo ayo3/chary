@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { api } from "@/lib/api";
 import Shell from "@/components/Shell";
 import { RiskBadge, SignalBadge, StatCard, ErrorBox } from "@/components/ui";
@@ -7,7 +8,6 @@ import {
   Shield, Zap, ArrowUpRight, ArrowDownRight, Database,
 } from "lucide-react";
 
-export const revalidate = 300;
 
 const SIGNAL_COLOR: Record<string, string> = {
   "STRONG RISE": "border-red-500/30 bg-red-500/5",
