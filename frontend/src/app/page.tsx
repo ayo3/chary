@@ -1,3 +1,4 @@
+"use client";
 import { api } from "@/lib/api";
 import Shell from "@/components/Shell";
 import { RiskBadge, SignalBadge, StatCard, ErrorBox } from "@/components/ui";
