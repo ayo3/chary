@@ -104,18 +104,26 @@ async def fetch_av_pair(client: httpx.AsyncClient, from_sym: str, to_sym: str) -
         return None
 
 
-async def fetch_yf_pair(ticker: str, start: str) -> Optional[pd.DataFrame]:
-    """Fetch FX pair from yfinance."""
+def _fetch_yf_pair_sync(ticker: str, start: str) -> Optional[pd.DataFrame]:
+    """Fetch FX pair from yfinance (sync)."""
     try:
-        raw = yf.Ticker(ticker).history(start=start, interval="1d")[["Close"]].reset_index()
-        raw = raw.rename(columns={"Close": "rate"})
+        raw = yf.download(ticker, start=start, interval="1d", progress=False, auto_adjust=True)
+        if raw.empty:
+            return None
+        raw = raw[["Close"]].reset_index()
+        raw.columns = ["Date", "rate"]
         raw["Date"] = pd.to_datetime(raw["Date"]).dt.tz_localize(None).dt.normalize()
-        raw = raw.sort_values("Date").reset_index(drop=True)
-        log.info(f"yfinance {ticker}: {len(raw)} rows")
+        raw = raw.dropna().sort_values("Date").reset_index(drop=True)
+        log.info(f"yfinance {ticker}: {len(raw)} rows through {raw['Date'].max().date()}")
         return raw if len(raw) > 10 else None
     except Exception as e:
         log.error(f"yfinance {ticker} error: {e}")
         return None
+
+async def fetch_yf_pair(ticker: str, start: str) -> Optional[pd.DataFrame]:
+    """Async wrapper for yfinance fetch."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _fetch_yf_pair_sync, ticker, start)
 
 
 async def fetch_er_today(client: httpx.AsyncClient, to_sym: str) -> Optional[float]:
@@ -434,29 +442,44 @@ async def pipeline():
         for pair_id, from_sym, to_sym, yf_ticker, display in tasks:
             df = None
 
-            # Try Alpha Vantage
-            df = await fetch_av_pair(client, from_sym, to_sym)
+            # 1. Try yfinance FIRST — free, real-time, no rate limits
+            if yf_ticker:
+                df = await fetch_yf_pair(yf_ticker, start_date)
+                if df is not None and len(df) > 100:
+                    log.info(f"{pair_id}: using yfinance ({len(df)} rows, through {df['Date'].max().date()})")
 
-            # Try yfinance if AV failed
+            # 2. Try Alpha Vantage as fallback
             if df is None or len(df) < 100:
-                if yf_ticker:
-                    df = await fetch_yf_pair(yf_ticker, start_date)
+                av_df = await fetch_av_pair(client, from_sym, to_sym)
+                if av_df is not None and len(av_df) > len(df or []):
+                    df = av_df
+                    log.info(f"{pair_id}: using Alpha Vantage ({len(df)} rows)")
 
-            # Try local CSV fallback for USDNGN
-            if df is None:
-                df = load_local_fx(pair_id)
+            # 3. Local CSV fallback for USDNGN only
+            if df is None or len(df) < 30:
+                local = load_local_fx(pair_id)
+                if local is not None:
+                    df = local
+                    log.info(f"{pair_id}: using local CSV fallback")
 
-            # Patch today's rate for USD/NGN from ExchangeRate-API
+            # Patch today's rate from ExchangeRate-API
             if pair_id == "USDNGN" and "NGN" in er_rates and df is not None:
                 today = pd.Timestamp.today().normalize()
                 if today not in df["Date"].values:
                     patch = pd.DataFrame([{"Date": today, "rate": er_rates["NGN"]}])
                     df = pd.concat([df, patch], ignore_index=True).sort_values("Date").reset_index(drop=True)
+                    log.info(f"USDNGN patched with today's rate: {er_rates['NGN']:.2f}")
+            elif pair_id == "USDCNY" and "CNY" in er_rates and df is not None:
+                today = pd.Timestamp.today().normalize()
+                if today not in df["Date"].values:
+                    patch = pd.DataFrame([{"Date": today, "rate": er_rates["CNY"]}])
+                    df = pd.concat([df, patch], ignore_index=True).sort_values("Date").reset_index(drop=True)
 
             if df is not None and len(df) > 30:
+                log.info(f"{pair_id}: final dataset {len(df)} rows, through {df['Date'].max().date()}")
                 pair_fx[pair_id] = df
             else:
-                log.warning(f"No data for {pair_id}")
+                log.warning(f"No data for {pair_id} — skipping")
 
         # Derive NGN/CNY = USDCNY / USDNGN
         if "USDNGN" in pair_fx and "USDCNY" in pair_fx:
