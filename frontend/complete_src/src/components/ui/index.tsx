@@ -38,10 +38,10 @@ export function SignalBadge({ signal }: { signal: string }) {
 }
 
 export function StatCard({
-  label, value, sub, icon: Icon, accent = "#3b82f6",
+  label, value, sub, accent = "#3b82f6",
 }: {
   label: string; value: React.ReactNode; sub?: string;
-  icon: React.ElementType; accent?: string;
+  icon?: unknown; accent?: string;
 }) {
   return (
     <div
@@ -54,7 +54,7 @@ export function StatCard({
       <div className="flex items-start justify-between mb-3">
         <span className="text-[10px] font-bold tracking-widest text-[#4a6fa5] uppercase">{label}</span>
         <div className="p-2 rounded-xl" style={{ background: `${accent}18` }}>
-          <Icon size={13} style={{ color: accent }} />
+          <span style={{ color: accent }}>●</span>
         </div>
       </div>
       <div className="text-xl font-black text-white font-mono tracking-tight">{value}</div>
