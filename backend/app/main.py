@@ -176,6 +176,81 @@ async def fetch_er_today(client: httpx.AsyncClient, to_sym: str) -> Optional[flo
         return None
 
 
+async def fetch_ngn_history(client: httpx.AsyncClient, local_csv_df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+    """
+    Build USD/NGN history by combining:
+    1. Local CSV (up to 2024-04-28)
+    2. ExchangeRate-API monthly history to fill gap to today
+    This gives us a complete dataset from 2016 to today.
+    """
+    base = local_csv_df.copy() if local_csv_df is not None else pd.DataFrame(columns=["Date", "rate"])
+    
+    if not EXCHANGERATE_KEY:
+        log.warning("No EXCHANGERATE_KEY — can't fetch NGN history gap")
+        return base if len(base) > 30 else None
+    
+    # Find the gap: from day after last CSV date to today
+    last_date = base["Date"].max() if len(base) > 0 else pd.Timestamp("2023-01-01")
+    today = pd.Timestamp.today().normalize()
+    
+    if (today - last_date).days <= 2:
+        log.info("NGN data already current")
+        return base
+    
+    log.info(f"Fetching NGN gap: {last_date.date()} → {today.date()} ({(today-last_date).days} days)")
+    
+    # Fetch each month in the gap from ExchangeRate-API history endpoint
+    new_rows = []
+    current = last_date + timedelta(days=1)
+    
+    # Fetch in monthly chunks to minimize API calls
+    months_fetched = 0
+    while current <= today and months_fetched < 36:  # max 3 years
+        year, month = current.year, current.month
+        try:
+            url = f"https://v6.exchangerate-api.com/v6/{EXCHANGERATE_KEY}/history/USD/{year}/{month}"
+            r = await client.get(url, timeout=15)
+            data = r.json()
+            
+            if data.get("result") == "success":
+                conversions = data.get("conversion_amounts", {})
+                # Try alternate response format
+                if not conversions:
+                    days_data = data.get("conversion_amounts") or data.get("rates") or {}
+                
+                # Actually use the month endpoint response
+                month_rates = data.get("conversion_rates") or data.get("rates") or {}
+                ngn_rate = month_rates.get("NGN")
+                if ngn_rate:
+                    # Use same rate for all business days in month (approximation)
+                    month_end = min(today, pd.Timestamp(year, month, 1) + pd.offsets.MonthEnd(0))
+                    for d in pd.date_range(current, month_end, freq="B"):
+                        new_rows.append({"Date": d.normalize(), "rate": float(ngn_rate)})
+                    log.info(f"NGN {year}/{month:02d}: rate={ngn_rate:.2f}")
+            months_fetched += 1
+        except Exception as e:
+            log.error(f"NGN history {year}/{month}: {e}")
+        
+        # Move to next month
+        if month == 12:
+            current = pd.Timestamp(year + 1, 1, 1)
+        else:
+            current = pd.Timestamp(year, month + 1, 1)
+        
+        await asyncio.sleep(0.5)  # be nice to the API
+    
+    if new_rows:
+        new_df = pd.DataFrame(new_rows)
+        combined = pd.concat([base, new_df], ignore_index=True)
+        combined = combined.drop_duplicates("Date").sort_values("Date").reset_index(drop=True)
+        log.info(f"NGN combined: {len(combined)} rows through {combined['Date'].max().date()}")
+        return combined
+    
+    # Fallback: just patch today's rate
+    log.warning("NGN history fetch returned no rows — patching today only")
+    return base
+
+
 async def fetch_er_historical(client: httpx.AsyncClient, to_sym: str, start: str) -> Optional[pd.DataFrame]:
     """
     Fetch historical USD/X rates from ExchangeRate-API.
@@ -434,6 +509,67 @@ def detect_alerts(pair_states: dict) -> list:
     return sorted(alerts, key=lambda x: {"HIGH": 0, "MEDIUM": 1, "LOW": 2}[x["severity"]])
 
 # ── Main Pipeline ─────────────────────────────────────────────────────────────
+
+async def fetch_usdngn_combined(client: httpx.AsyncClient, er_rates: dict) -> Optional[pd.DataFrame]:
+    """
+    Build USD/NGN history by combining:
+    1. Local CSV (up to May 2024)
+    2. ExchangeRate-API /history endpoint for recent months
+    3. Today's live rate from er_rates
+    """
+    frames = []
+
+    # 1. Load local CSV as base
+    local = load_local_fx("USDNGN")
+    if local is not None:
+        frames.append(local)
+        log.info(f"USDNGN local CSV: {len(local)} rows through {local['Date'].max().date()}")
+
+    # 2. Fetch recent history from ExchangeRate-API (month by month from May 2024)
+    if EXCHANGERATE_KEY:
+        try:
+            # Get history from last known date to today
+            start_month = pd.Timestamp("2024-05-01")
+            end_month   = pd.Timestamp.today()
+            current     = start_month
+            fetched_rows = []
+
+            while current <= end_month:
+                year  = current.year
+                month = current.month
+                url   = f"https://v6.exchangerate-api.com/v6/{EXCHANGERATE_KEY}/history/USD/{year}/{month}"
+                try:
+                    r = await client.get(url, timeout=15)
+                    data = r.json()
+                    if data.get("result") == "success":
+                        for day, rates in data.get("conversion_rates", {}).items():
+                            ngn_rate = rates.get("NGN") if isinstance(rates, dict) else None
+                            if ngn_rate:
+                                fetched_rows.append({"Date": pd.Timestamp(f"{year}-{month:02d}-{int(day):02d}"), "rate": float(ngn_rate)})
+                except Exception as ex:
+                    log.warning(f"ExchangeRate-API history {year}/{month}: {ex}")
+                current = current + pd.DateOffset(months=1)
+                await asyncio.sleep(0.3)  # be polite
+
+            if fetched_rows:
+                hist_df = pd.DataFrame(fetched_rows).sort_values("Date").reset_index(drop=True)
+                frames.append(hist_df)
+                log.info(f"USDNGN ExchangeRate-API history: {len(hist_df)} rows")
+        except Exception as e:
+            log.error(f"ExchangeRate-API history error: {e}")
+
+    # 3. Patch today's live rate
+    if "NGN" in er_rates:
+        today = pd.Timestamp.today().normalize()
+        frames.append(pd.DataFrame([{"Date": today, "rate": er_rates["NGN"]}]))
+        log.info(f"USDNGN live patch: {er_rates['NGN']:.2f}")
+
+    if not frames:
+        return None
+
+    combined = pd.concat(frames, ignore_index=True)
+    combined = combined.sort_values("Date").drop_duplicates("Date", keep="last").reset_index(drop=True)
+    return combined
 
 async def pipeline():
     global MODELS, OIL_DATA, LAST_TRAINED
