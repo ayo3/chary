@@ -92,7 +92,7 @@ async def fetch_frankfurter(client: httpx.AsyncClient, from_sym: str, to_sym: st
     Works in all cloud environments. Supports major pairs only (no NGN).
     """
     try:
-        url = f"https://api.frankfurter.app/{start}..?from={from_sym}&to={to_sym}"
+        url = f"https://api.frankfurter.dev/v1/{start}..?from={from_sym}&to={to_sym}"
         r = await client.get(url, timeout=30)
         data = r.json()
         rates = data.get("rates", {})
@@ -173,6 +173,57 @@ async def fetch_er_today(client: httpx.AsyncClient, to_sym: str) -> Optional[flo
         return float(rate) if rate else None
     except Exception as e:
         log.error(f"ExchangeRate-API error: {e}")
+        return None
+
+
+async def fetch_er_historical(client: httpx.AsyncClient, to_sym: str, start: str) -> Optional[pd.DataFrame]:
+    """
+    Fetch historical USD/X rates from ExchangeRate-API.
+    Uses the /history endpoint — available on free tier.
+    Fetches month by month from start date to today.
+    """
+    if not EXCHANGERATE_KEY:
+        return None
+    try:
+        rows = []
+        start_dt = pd.Timestamp(start)
+        end_dt   = pd.Timestamp.today()
+        current  = start_dt.replace(day=1)
+
+        # Limit to last 2 years to avoid too many API calls
+        if (end_dt - start_dt).days > 730:
+            current = (end_dt - timedelta(days=730)).replace(day=1)
+
+        month_count = 0
+        while current <= end_dt and month_count < 24:
+            year  = current.year
+            month = current.month
+            url = f"https://v6.exchangerate-api.com/v6/{EXCHANGERATE_KEY}/history/USD/{year}/{month}"
+            try:
+                r = await client.get(url, timeout=15)
+                data = r.json()
+                if data.get("result") == "success":
+                    for day_str, rates in data.get("conversion_rates", {}).items():
+                        rate = rates.get(to_sym)
+                        if rate:
+                            rows.append({"Date": pd.Timestamp(day_str), "rate": float(rate)})
+            except Exception:
+                pass
+            # Move to next month
+            if current.month == 12:
+                current = current.replace(year=current.year+1, month=1)
+            else:
+                current = current.replace(month=current.month+1)
+            month_count += 1
+            await asyncio.sleep(0.2)  # small delay
+
+        if not rows:
+            return None
+        df = pd.DataFrame(rows).sort_values("Date").drop_duplicates("Date").reset_index(drop=True)
+        log.info(f"ER Historical USD/{to_sym}: {len(df)} rows through {df['Date'].max().date()}")
+        return df
+    except Exception as e:
+        log.error(f"ER Historical error: {e}")
         return None
 
 
@@ -444,30 +495,48 @@ async def pipeline():
             if df is not None and is_fresh(df):
                 pair_fx["USDCNY"] = df
 
-        # ── USD/NGN via Alpha Vantage (best source for NGN) ────────────────────
-        log.info("Fetching USD/NGN from Alpha Vantage...")
-        df = await fetch_av_pair(client, "USD", "NGN")
-        if df is not None and is_fresh(df):
-            pair_fx["USDNGN"] = df
-            log.info(f"AV USD/NGN: fresh data through {df['Date'].max().date()}")
-        else:
-            log.warning("AV USD/NGN stale or failed — trying yfinance")
-            df = await fetch_yf("USDNGN=X", start_5y)
-            if df is not None and len(df) > 30:
-                pair_fx["USDNGN"] = df
-            else:
-                df = load_local_fx("USDNGN")
-                if df is not None:
-                    pair_fx["USDNGN"] = df
-                    log.info("USDNGN: using local CSV fallback")
+        # ── USD/NGN: ExchangeRate-API historical + AV + local fallback ──────────
+        log.info("Fetching USD/NGN historical data...")
+        ngn_df = None
 
-        # Patch today's NGN rate
+        # Try ExchangeRate-API historical (most reliable for NGN)
+        if EXCHANGERATE_KEY:
+            ngn_df = await fetch_er_historical(client, "NGN", start_5y)
+
+        # Try Alpha Vantage
+        if ngn_df is None or not is_fresh(ngn_df):
+            log.info("Trying AV for USD/NGN...")
+            av_df = await fetch_av_pair(client, "USD", "NGN")
+            if av_df is not None:
+                if ngn_df is not None and len(ngn_df) > len(av_df):
+                    pass  # keep ER historical
+                else:
+                    ngn_df = av_df
+
+        # yfinance fallback
+        if ngn_df is None or len(ngn_df) < 30:
+            yf_df = await fetch_yf("USDNGN=X", start_5y)
+            if yf_df is not None and len(yf_df) > 30:
+                ngn_df = yf_df
+
+        # Local CSV last resort
+        if ngn_df is None or len(ngn_df) < 30:
+            ngn_df = load_local_fx("USDNGN")
+            if ngn_df is not None:
+                log.info("USDNGN: using local CSV fallback")
+
+        if ngn_df is not None:
+            pair_fx["USDNGN"] = ngn_df
+
+        # Always patch today's live NGN rate
         if "USDNGN" in pair_fx and "NGN" in er_rates:
             today = pd.Timestamp.today().normalize()
-            if today not in pair_fx["USDNGN"]["Date"].values:
-                patch = pd.DataFrame([{"Date": today, "rate": er_rates["NGN"]}])
-                pair_fx["USDNGN"] = pd.concat([pair_fx["USDNGN"], patch], ignore_index=True).sort_values("Date").reset_index(drop=True)
-                log.info(f"USDNGN patched with live rate: {er_rates['NGN']:.2f}")
+            df_ngn = pair_fx["USDNGN"]
+            # Remove old today entry if exists and replace with live rate
+            df_ngn = df_ngn[df_ngn["Date"] < today]
+            patch = pd.DataFrame([{"Date": today, "rate": er_rates["NGN"]}])
+            pair_fx["USDNGN"] = pd.concat([df_ngn, patch], ignore_index=True).sort_values("Date").reset_index(drop=True)
+            log.info(f"USDNGN: today's live rate patched: {er_rates['NGN']:.2f}")
 
         # ── NGN/CNY derived ────────────────────────────────────────────────────
         if "USDNGN" in pair_fx and "USDCNY" in pair_fx:
