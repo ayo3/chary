@@ -19,7 +19,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from apscheduler.schedulers.background import BackgroundScheduler
 import yfinance as yf
-import httpx, os, logging, asyncio
+import httpx, os, logging, asyncio, time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -81,23 +81,31 @@ def volatility_level(vol: float, threshold: float) -> str:
 
 # ── Live Data Fetchers ────────────────────────────────────────────────────────
 
-async def fetch_av_pair(client: httpx.AsyncClient, from_sym: str, to_sym: str) -> Optional[pd.DataFrame]:
-    """Fetch daily FX pair from Alpha Vantage."""
+async def fetch_av_pair(client: httpx.AsyncClient, from_sym: str, to_sym: str, delay: float = 0) -> Optional[pd.DataFrame]:
+    """Fetch daily FX pair from Alpha Vantage with optional delay for rate limiting."""
     if not ALPHA_VANTAGE_KEY:
         return None
+    if delay > 0:
+        await asyncio.sleep(delay)
     try:
         url = (
             f"https://www.alphavantage.co/query"
             f"?function=FX_DAILY&from_symbol={from_sym}&to_symbol={to_sym}"
             f"&outputsize=full&apikey={ALPHA_VANTAGE_KEY}"
         )
-        r = await client.get(url, timeout=20)
-        ts = r.json().get("Time Series FX (Daily)", {})
+        r = await client.get(url, timeout=30)
+        data = r.json()
+        # Check for rate limit message
+        if "Note" in data or "Information" in data:
+            log.warning(f"AV rate limit hit for {from_sym}/{to_sym}")
+            return None
+        ts = data.get("Time Series FX (Daily)", {})
         if not ts:
+            log.warning(f"AV {from_sym}/{to_sym}: empty response")
             return None
         rows = [{"Date": pd.Timestamp(d), "rate": float(v["4. close"])} for d, v in ts.items()]
         df = pd.DataFrame(rows).sort_values("Date").reset_index(drop=True)
-        log.info(f"AV {from_sym}/{to_sym}: {len(df)} rows")
+        log.info(f"AV {from_sym}/{to_sym}: {len(df)} rows through {df['Date'].max().date()}")
         return df
     except Exception as e:
         log.error(f"AV {from_sym}/{to_sym} error: {e}")
@@ -110,6 +118,8 @@ def _fetch_yf_pair_sync(ticker: str, start: str) -> Optional[pd.DataFrame]:
         raw = yf.download(ticker, start=start, interval="1d", progress=False, auto_adjust=True)
         if raw.empty:
             return None
+        if hasattr(raw.columns, 'levels'):
+            raw.columns = raw.columns.droplevel(1)
         raw = raw[["Close"]].reset_index()
         raw.columns = ["Date", "rate"]
         raw["Date"] = pd.to_datetime(raw["Date"]).dt.tz_localize(None).dt.normalize()
@@ -442,24 +452,14 @@ async def pipeline():
         for pair_id, from_sym, to_sym, yf_ticker, display in tasks:
             df = None
 
-            # 1. Try yfinance FIRST — free, real-time, no rate limits
+            # 1. yfinance — primary source, free, real-time
             if yf_ticker:
-                df = await fetch_yf_pair(yf_ticker, start_date)
-                if df is not None and len(df) > 100:
-                    log.info(f"{pair_id}: using yfinance ({len(df)} rows, through {df['Date'].max().date()})")
+                df = _fetch_yf_pair_sync(yf_ticker, start_date)
 
-            # 2. Try Alpha Vantage as fallback
-            if df is None or len(df) < 100:
-                av_df = await fetch_av_pair(client, from_sym, to_sym)
-                if av_df is not None and len(av_df) > len(df or []):
-                    df = av_df
-                    log.info(f"{pair_id}: using Alpha Vantage ({len(df)} rows)")
-
-            # 3. Local CSV fallback for USDNGN only
-            if df is None or len(df) < 30:
-                local = load_local_fx(pair_id)
-                if local is not None:
-                    df = local
+            # 2. Local CSV fallback for USDNGN only
+            if (df is None or len(df) < 30) and pair_id == "USDNGN":
+                df = load_local_fx(pair_id)
+                if df is not None:
                     log.info(f"{pair_id}: using local CSV fallback")
 
             # Patch today's rate from ExchangeRate-API
