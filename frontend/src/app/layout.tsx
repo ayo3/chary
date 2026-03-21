@@ -2,14 +2,19 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FX Risk Intelligence",
-  description: "USD/NGN FX prediction platform for African fintechs",
+  title: "Chary — FX Risk Intelligence",
+  description: "Multi-currency FX prediction platform for businesses",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+      </head>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
