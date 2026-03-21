@@ -38,7 +38,7 @@ const INDUSTRY_INSIGHTS: Record<string, (d: any) => { title: string; subtitle: s
     subtitle: "Real-time FX signals for spread optimization and conversion timing",
     cards: [
       { label: "Spread Recommendation", value: d?.high_vol ? "Widen to 0.8–1.2%" : "Hold at 0.4–0.6%", tag: d?.high_vol ? "Action" : "Stable", color: d?.high_vol ? "#f59e0b" : "#22c55e", detail: d?.high_vol ? "Volatility above threshold — protect margins" : "Normal conditions, standard spread policy" },
-      { label: "Conversion Window", value: d?.up ? "Delay NGN conversions" : "Execute now", tag: d?.up ? "Wait" : "Go", color: d?.up ? "#f59e0b" : "#22c55e", detail: d?.up ? "NGN weakening predicted — hold USD" : "Favourable window for large conversions" },
+      { label: "Conversion Window", value: d?.up ? "Delay NGN conversions" : "Execute now", tag: d?.up ? "Wait" : "Go", color: d?.up ? "#22c55e" : "#f59e0b", detail: d?.up ? "NGN weakening predicted — hold USD" : "Favourable window for large conversions" },
       { label: "Liquidity Buffer", value: d?.high_vol ? "+15% USD reserve" : "Maintain buffer", tag: d?.high_vol ? "Increase" : "Hold", color: d?.high_vol ? "#f43f5e" : "#6366f1", detail: d?.high_vol ? "Spike risk elevated — increase emergency reserve" : "Reserves adequate at current volatility" },
     ],
   }),
@@ -46,7 +46,7 @@ const INDUSTRY_INSIGHTS: Record<string, (d: any) => { title: string; subtitle: s
     title: "FX Desk Intelligence",
     subtitle: "Trading signals and position risk for commercial FX desks",
     cards: [
-      { label: "Trading Signal", value: d?.up ? "Net Long USD" : "Reduce USD", tag: d?.up ? "BUY" : "SELL", color: d?.up ? "#f43f5e" : "#22c55e", detail: d?.up ? "Model predicts NGN depreciation — position long USD" : "NGN recovery signal — reduce USD exposure" },
+      { label: "Trading Signal", value: d?.up ? "Net Long USD" : "Reduce USD", tag: d?.up ? "BUY" : "SELL", color: d?.up ? "#22c55e" : "#f43f5e", detail: d?.up ? "Model predicts NGN depreciation — position long USD" : "NGN recovery signal — reduce USD exposure" },
       { label: "Client Advisory", value: `${d?.acc?.toFixed(0)}% confidence`, tag: "Brief Clients", color: "#6366f1", detail: "Communicate directional view to corporate clients proactively" },
       { label: "Interbank Limits", value: d?.high_vol ? "Tighten limits" : "Normal limits", tag: d?.high_vol ? "Alert" : "Normal", color: d?.high_vol ? "#f59e0b" : "#38bdf8", detail: d?.high_vol ? "Reduce client FX exposure limits during high vol" : "Standard limits appropriate" },
     ],
@@ -55,8 +55,8 @@ const INDUSTRY_INSIGHTS: Record<string, (d: any) => { title: string; subtitle: s
     title: "Dynamic Pricing Engine",
     subtitle: "FX-adjusted pricing signals for cross-border e-commerce",
     cards: [
-      { label: "Price Adjustment", value: d?.up ? `+${(Math.abs(d?.change || 0) * 1.2).toFixed(1)}% buffer` : "Hold prices", tag: d?.up ? "Adjust" : "Stable", color: d?.up ? "#f59e0b" : "#22c55e", detail: d?.up ? "Add FX buffer to USD-priced inventory now" : "NGN pricing stable — no adjustment needed" },
-      { label: "Import Timing", value: d?.up ? "Pre-buy USD now" : "Delay purchase", tag: d?.up ? "Buy" : "Wait", color: d?.up ? "#f43f5e" : "#38bdf8", detail: d?.up ? "Lock in USD at current rate before depreciation" : "Spot rate may improve — monitor 24–48h" },
+      { label: "Price Adjustment", value: d?.up ? `+${(Math.abs(d?.change || 0) * 1.2).toFixed(1)}% buffer` : "Hold prices", tag: d?.up ? "Adjust" : "Stable", color: d?.up ? "#22c55e" : "#f59e0b", detail: d?.up ? "Add FX buffer to USD-priced inventory now" : "NGN pricing stable — no adjustment needed" },
+      { label: "Import Timing", value: d?.up ? "Pre-buy USD now" : "Delay purchase", tag: d?.up ? "Buy" : "Wait", color: d?.up ? "#22c55e" : "#f43f5e", detail: d?.up ? "Lock in USD at current rate before depreciation" : "Spot rate may improve — monitor 24–48h" },
       { label: "Margin Protection", value: d?.high_vol ? "Hedge Q2 exposure" : "Margins safe", tag: d?.high_vol ? "Hedge" : "OK", color: d?.high_vol ? "#f43f5e" : "#22c55e", detail: d?.high_vol ? "High volatility — activate FX hedging strategy" : "Standard margins safe, no hedging needed" },
     ],
   }),
@@ -64,7 +64,7 @@ const INDUSTRY_INSIGHTS: Record<string, (d: any) => { title: string; subtitle: s
     title: "Trade Finance Intelligence",
     subtitle: "Supplier payment timing and import cost forecasting",
     cards: [
-      { label: "Supplier Payments", value: d?.up ? "Pay invoices today" : "Delay 1–2 days", tag: d?.up ? "Pay Now" : "Delay", color: d?.up ? "#f43f5e" : "#38bdf8", detail: d?.up ? "NGN weakening — settle USD invoices at current rate" : "NGN may strengthen — short delay could save cost" },
+      { label: "Supplier Payments", value: d?.up ? "Pay invoices today" : "Delay 1–2 days", tag: d?.up ? "Pay Now" : "Delay", color: d?.up ? "#22c55e" : "#f43f5e", detail: d?.up ? "NGN weakening — settle USD invoices at current rate" : "NGN may strengthen — short delay could save cost" },
       { label: "FX Purchase", value: d?.up ? "Pre-buy USD forward" : "Spot rate OK", tag: "Schedule", color: "#6366f1", detail: "Align currency purchases with shipment schedule" },
       { label: "Margin Impact", value: `~${(Math.abs(d?.change || 0.5) * 0.8).toFixed(2)}% FX cost`, tag: "Monitor", color: "#f59e0b", detail: "Estimated FX contribution to import cost this week" },
     ],
@@ -73,7 +73,7 @@ const INDUSTRY_INSIGHTS: Record<string, (d: any) => { title: string; subtitle: s
     title: "Freight & Route Intelligence",
     subtitle: "FX-adjusted freight pricing and corridor risk management",
     cards: [
-      { label: "Freight Surcharge", value: d?.up ? `+${(Math.abs(d?.change || 0) * 0.9).toFixed(1)}% FX add` : "No surcharge", tag: d?.up ? "Reprice" : "Hold", color: d?.up ? "#f59e0b" : "#22c55e", detail: d?.up ? "USD freight rates need FX adjustment" : "Current freight rates adequate" },
+      { label: "Freight Surcharge", value: d?.up ? `+${(Math.abs(d?.change || 0) * 0.9).toFixed(1)}% FX add` : "No surcharge", tag: d?.up ? "Reprice" : "Hold", color: d?.up ? "#22c55e" : "#f59e0b", detail: d?.up ? "USD freight rates need FX adjustment" : "Current freight rates adequate" },
       { label: "Route Risk", value: d?.high_vol ? "West Africa alert" : "All routes clear", tag: d?.high_vol ? "High Risk" : "Low Risk", color: d?.high_vol ? "#f43f5e" : "#22c55e", detail: d?.high_vol ? "Flag NGN-exposed corridors for clients" : "All trade routes within normal FX risk band" },
       { label: "Contract Clause", value: d?.high_vol ? "Add FX clause" : "Standard OK", tag: d?.high_vol ? "Required" : "Optional", color: d?.high_vol ? "#f43f5e" : "#38bdf8", detail: d?.high_vol ? "Insert FX adjustment clause in new contracts" : "Standard contract terms acceptable" },
     ],
@@ -82,7 +82,7 @@ const INDUSTRY_INSIGHTS: Record<string, (d: any) => { title: string; subtitle: s
     title: "Revenue & Pricing Intelligence",
     subtitle: "Ticket pricing and fuel FX risk for airlines and travel",
     cards: [
-      { label: "Ticket Pricing", value: d?.up ? "Raise NGN prices" : "Hold fares", tag: d?.up ? "Adjust" : "Stable", color: d?.up ? "#f59e0b" : "#22c55e", detail: d?.up ? "NGN depreciation increases USD cost per ticket" : "NGN stable — current pricing maintains margin" },
+      { label: "Ticket Pricing", value: d?.up ? "Raise NGN prices" : "Hold fares", tag: d?.up ? "Adjust" : "Stable", color: d?.up ? "#22c55e" : "#f59e0b", detail: d?.up ? "NGN depreciation increases USD cost per ticket" : "NGN stable — current pricing maintains margin" },
       { label: "Revenue Conversion", value: d?.up ? "Convert USD now" : "Hold USD rev.", tag: d?.up ? "Convert" : "Hold", color: d?.up ? "#22c55e" : "#38bdf8", detail: d?.up ? "Favourable to convert USD revenue to NGN today" : "Hold USD revenue — NGN may recover" },
       { label: "Fuel Hedge Signal", value: d?.high_vol ? "Hedge 60-day fuel" : "Spot OK", tag: d?.high_vol ? "Hedge" : "Spot", color: d?.high_vol ? "#f43f5e" : "#6366f1", detail: d?.high_vol ? "High vol — lock in fuel costs via forward contract" : "Spot purchases acceptable at current vol" },
     ],
@@ -91,7 +91,7 @@ const INDUSTRY_INSIGHTS: Record<string, (d: any) => { title: string; subtitle: s
     title: "Portfolio FX Intelligence",
     subtitle: "Currency overlay and allocation signals for asset managers",
     cards: [
-      { label: "Currency Allocation", value: d?.up ? "Increase USD assets" : "Rotate to NGN", tag: d?.up ? "OW USD" : "OW NGN", color: d?.up ? "#f43f5e" : "#22c55e", detail: d?.up ? "Overweight USD-denominated assets — NGN weakening" : "Rotate to NGN assets — depreciation slowing" },
+      { label: "Currency Allocation", value: d?.up ? "Increase USD assets" : "Rotate to NGN", tag: d?.up ? "OW USD" : "OW NGN", color: d?.up ? "#22c55e" : "#f43f5e", detail: d?.up ? "Overweight USD-denominated assets — NGN weakening" : "Rotate to NGN assets — depreciation slowing" },
       { label: "Vol Risk Signal", value: d?.high_vol ? "Risk-off mode" : "Risk-on OK", tag: d?.high_vol ? "Defensive" : "Normal", color: d?.high_vol ? "#f43f5e" : "#6366f1", detail: d?.high_vol ? "Reduce FX-exposed positions, increase safe assets" : "Normal risk allocation appropriate" },
       { label: "Signal Quality", value: `${d?.acc?.toFixed(0)}% direction acc.`, tag: d?.acc > 60 ? "Strong" : "Moderate", color: d?.acc > 60 ? "#22c55e" : "#f59e0b", detail: `Model accuracy on test data — ${d?.acc > 60 ? "high confidence signals" : "use with discretion"}` },
     ],
@@ -102,7 +102,7 @@ const INDUSTRY_INSIGHTS: Record<string, (d: any) => { title: string; subtitle: s
     cards: [
       { label: "Cash Conversion", value: d?.up ? "Accelerate USD→NGN" : "Hold USD cash", tag: d?.up ? "Convert" : "Hold", color: d?.up ? "#f59e0b" : "#38bdf8", detail: d?.up ? "NGN weakening — accelerate conversion before move" : "Hold USD — NGN may recover short term" },
       { label: "Hedging Budget", value: d?.high_vol ? "Increase allocation" : "Standard ratio", tag: d?.high_vol ? "Raise" : "Hold", color: d?.high_vol ? "#f43f5e" : "#6366f1", detail: d?.high_vol ? "Allocate more budget to forward contracts" : "Current hedge ratio adequate" },
-      { label: "Payroll Signal", value: d?.up ? "Pre-fund NGN payroll" : "Normal cycle", tag: d?.up ? "Pre-Fund" : "Normal", color: d?.up ? "#f59e0b" : "#22c55e", detail: d?.up ? "Fund NGN payroll accounts today at current rate" : "Standard payroll timing OK" },
+      { label: "Payroll Signal", value: d?.up ? "Pre-fund NGN payroll" : "Normal cycle", tag: d?.up ? "Pre-Fund" : "Normal", color: d?.up ? "#22c55e" : "#f59e0b", detail: d?.up ? "Fund NGN payroll accounts today at current rate" : "Standard payroll timing OK" },
     ],
   }),
   government: (d) => ({
@@ -195,6 +195,7 @@ export default function Dashboard() {
   const currentInd     = INDUSTRIES.find(i => i.id === industry)!;
   const l              = pairData?.latest;
   const up             = (l?.predicted_change || 0) > 0;
+  // Standard: positive = green (up), negative = red (down)
   const insightData    = { up, high_vol: !!l?.high_volatility_flag, change: l?.predicted_change, acc: pairData?.metrics?.direction_accuracy_best };
   const insights       = INDUSTRY_INSIGHTS[industry]?.(insightData);
   const isNGN          = selectedPair?.includes("NGN");
@@ -272,7 +273,7 @@ export default function Dashboard() {
                       <span className={`text-sm font-semibold ${selectedPair === p.pair_id ? "text-[#6366f1]" : "text-white"}`}>{p.display_name}</span>
                       <div className="text-right">
                         <div className="text-xs font-mono font-bold text-white">{p.current_rate?.toFixed(p.pair_id?.includes("NGN") ? 2 : 4)}</div>
-                        <div className={`text-[10px] font-bold ${p.change_1d > 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                        <div className={`text-[10px] font-bold ${p.change_1d > 0 ? "text-emerald-400" : "text-rose-400"}`}>
                           {p.change_1d > 0 ? "+" : ""}{p.change_1d?.toFixed(3)}%
                         </div>
                       </div>
