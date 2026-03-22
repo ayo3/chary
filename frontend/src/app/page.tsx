@@ -7,7 +7,7 @@ import {
 import {
   TrendingUp, TrendingDown, Bell, ChevronDown,
   AlertTriangle, ArrowUpRight, ArrowDownRight,
-  Activity, Zap, Globe, X, RefreshCw, BarChart2,
+  Activity, Zap, Globe, X, RefreshCw, BarChart2, Info,
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -132,6 +132,70 @@ function CustomTooltip({ active, payload, label }: any) {
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Insight Card with hover tooltip ──────────────────────────────────────────
+function InsightCard({ card }: { card: any }) {
+  const [showTip, setShowTip] = useState(false);
+  return (
+    <div
+      className="relative bg-[#141820] border border-[#1e2535] rounded-2xl p-5 hover:border-[#2d3748] transition-all group"
+      style={{ borderLeftColor: card.color, borderLeftWidth: 3 }}
+    >
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">{card.label}</span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap"
+            style={{ color: card.color, borderColor: `${card.color}30`, background: `${card.color}10` }}
+          >
+            {card.tag}
+          </span>
+          {/* Info button */}
+          <button
+            onMouseEnter={() => setShowTip(true)}
+            onMouseLeave={() => setShowTip(false)}
+            onFocus={() => setShowTip(true)}
+            onBlur={() => setShowTip(false)}
+            className="w-5 h-5 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-300 hover:bg-[#2d3748] transition-all flex-shrink-0"
+            aria-label="More information"
+          >
+            <Info size={11} />
+          </button>
+        </div>
+      </div>
+
+      {/* Value */}
+      <p className="text-sm font-bold text-white mb-1">{card.value}</p>
+      <p className="text-xs text-slate-500 leading-relaxed group-hover:text-slate-400 transition-colors">{card.detail}</p>
+
+      {/* Tooltip */}
+      {showTip && (
+        <div className="absolute bottom-full left-0 mb-2 z-50 w-64 pointer-events-none">
+          <div
+            className="rounded-xl p-3.5 shadow-2xl border text-xs leading-relaxed"
+            style={{
+              background: "#0f1117",
+              borderColor: `${card.color}40`,
+              boxShadow: `0 0 20px ${card.color}15`,
+            }}
+          >
+            {/* Colored top accent */}
+            <div className="h-0.5 rounded-full mb-3 -mx-3.5 -mt-3.5 rounded-t-xl" style={{ background: `linear-gradient(90deg, ${card.color}, transparent)` }} />
+            <p className="font-bold mb-1.5" style={{ color: card.color }}>{card.label}</p>
+            <p className="text-slate-300 mb-2">{card.detail}</p>
+            <div className="border-t border-[#1e2535] pt-2 mt-2 flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: card.color }} />
+              <span className="text-slate-500 text-[10px]">Based on live ML model output</span>
+            </div>
+          </div>
+          {/* Arrow */}
+          <div className="w-2.5 h-2.5 rotate-45 ml-4 -mt-1.5 border-r border-b" style={{ background: "#0f1117", borderColor: `${card.color}40` }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -536,17 +600,7 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {insights.cards.map((card, i) => (
-                <div key={i} className="bg-[#141820] border border-[#1e2535] rounded-2xl p-5 hover:border-[#2d3748] transition-all group" style={{ borderLeftColor: card.color, borderLeftWidth: 3 }}>
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{card.label}</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap"
-                      style={{ color: card.color, borderColor: `${card.color}30`, background: `${card.color}10` }}>
-                      {card.tag}
-                    </span>
-                  </div>
-                  <p className="text-sm font-bold text-white mb-2">{card.value}</p>
-                  <p className="text-xs text-slate-500 leading-relaxed group-hover:text-slate-400 transition-colors">{card.detail}</p>
-                </div>
+                <InsightCard key={i} card={card} />
               ))}
             </div>
           </div>
